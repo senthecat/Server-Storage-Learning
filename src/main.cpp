@@ -7,9 +7,9 @@
 const char* ssid = "F9BEE3-gateway";
 const char* password = "Blue7901";
 
-#define WS_HOST ""
+#define WS_HOST "y3txhbyqo6.execute-api.us-west-1.amazonaws.com"
 #define WS_PORT 443
-#define WS_URL  ""
+#define WS_URL  "/dev"
 
 #define MSG_SIZE  256
 
