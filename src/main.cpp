@@ -40,10 +40,10 @@ uint8_t toMode(const char* val) {
 }
 
 // payload handler
-void handlePayload(uint8_t* payload) {
+void handlePayload(uint8_t* payload, size_t length) {
   JsonDocument doc;
 
-  DeserializationError error = deserializeJson(doc, payload);
+  DeserializationError error = deserializeJson(doc, payload, length);
 
   // incorrect json
   if (error) {
@@ -72,7 +72,7 @@ void handlePayload(uint8_t* payload) {
       return;
     }
     if (strcmp(doc["body"]["type"],  "digitalWrite") == 0) {
-      digitalWrite(doc["body"]["pin"], toMode(doc["body"]["value"]));
+      digitalWrite(doc["body"]["pin"], (int)doc["body"]["value"]);
       sendOkMessage();
       return;
     }
@@ -96,16 +96,16 @@ void handlePayload(uint8_t* payload) {
 // Event Handler for websocket
 void onWSEventHandler(WStype_t type, uint8_t * payload, size_t length) {
   switch (type) {
-    WStype_CONNECTED:
+    case WStype_CONNECTED:
       Serial.println("WS Connected");
       break;
-    WStype_DISCONNECTED:
+    case WStype_DISCONNECTED:
       Serial.println("WS Disconnected");
       break;
-    WStype_TEXT:
+    case WStype_TEXT:
       Serial.printf("WS Message: %s\n", payload);
       
-      handlePayload(payload);
+      handlePayload(payload, length);
 
       break;
   }
