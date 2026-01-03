@@ -14,9 +14,10 @@ const char* password = "Blue7901";
 #define WS_PORT 443
 #define WS_URL  "/dev"
 
-#define MSG_SIZE  256
-#define LCD_SIZE  16
-#define LCD_ROWS  2
+#define MSG_SIZE    256
+#define LCD_SIZE    16
+#define LCD_ROWS    2
+#define MAX_SPACES  5
 
 /* LCD Constant Variables Constants */
 #define RS  21
@@ -27,8 +28,7 @@ const char* password = "Blue7901";
 #define D7  26
 
 /* Physical Integraiton */
-#define MSG_LED 4
-#define NEXT_BUTTON 12
+#define NEXT_BUTTON 27
 
 /* Main Variables */
 WiFiMulti wifiMulti;
@@ -59,78 +59,52 @@ uint8_t toMode(const char* val) {
   return INPUT;
 }
 
-void lcdSentenceWrap(const char* text) {
-  if (!text) return;
-
+void lcdPublishSentence(const char* name, const char* text) {
   lcd.clear();
 
-  uint8_t col = 0;
-  uint8_t row = 0;
+  uint8_t maxSpaces = MAX_SPACES;
 
-  auto newLine = [&]() -> bool {
-    row++;
-    if (row >= LCD_ROWS) return false;
-    col = 0;
-    lcd.setCursor(col, row);
-    return true;
-  };
+  char topRow[LCD_SIZE+1]; 
+  sprintf(topRow, "%s says", name ? name : "ur mom");
+  topRow[LCD_SIZE] = '\0';
 
-  auto printChar = [&](char c) -> bool {
-    if (row >= LCD_ROWS) return false;
-    if (col >= LCD_SIZE) {
-      if (!newLine()) return false;
-    }
-    lcd.print(c);
-    col++;
-    return true;
-  };
+  // Initial print topRow
+  lcd.home();
+  lcd.print(topRow);
 
-  const char* p = text;
+  if (!text) text = "";
+  size_t len = strlen(text);
 
-  while (*p && row < LCD_ROWS) {
-    while (*p == ' ') p++;
-    if (!*p) break;
+  lcd.setCursor(0,1);
+  if (len <= LCD_SIZE) {
+    lcd.print(text);
+    for (size_t i = len ; i < LCD_SIZE; i ++) lcd.print(' ');
+    return;
+  }
 
-    const char* wStart = p;
-    while (*p && *p != ' ') p++;
-    const char* wEnd = p;
+  const size_t gap = MAX_SPACES;
+  const size_t cycle = len + gap;
 
-    uint8_t wLen = (uint8_t)(wEnd - wStart);
-    uint8_t leadingSpace = (col == 0) ? 0 : 1;
+  size_t offset = 0;
 
-    // if there is space left print word
-    if (wLen + leadingSpace <= (LCD_SIZE - col)) {
-      if (leadingSpace) {
-        if (!printChar(' ')) break;
-      }
-      for (const char* q = wStart; q < wEnd; q++) {
-        if (*q == '\n') continue;
-        if (!printChar(*q)) break;
-      }
-      continue;
+  while (digitalRead(NEXT_BUTTON) == LOW) {
+    lcd.setCursor(0, 1);
+
+    for (size_t i = 0; i < LCD_SIZE; i++) {
+      size_t idx = (offset + i) % cycle;
+      char c = (idx < len) ? text[idx] : ' ';
+      lcd.print(c);
     }
 
-    if (wLen <= LCD_SIZE) {
-      if (!newLine()) break;
-      for (const char* q = wStart; q < wEnd; q++) {
-        if (*q == '\n') break;
-        if (!printChar(*q)) break;
-      }
-      continue;
+    // For first print give a small delay
+    if (offset == 0) {
+      delay(1000);
     }
 
-    // for when word is > LCD_SIZE
-    if (col != 0) {
-      if (!newLine()) break;
-    }
-
-    for (const char* q = wStart; q < wEnd; q++) {
-      if (*q == '\n') break;
-      if (!printChar(*q)) break; 
-    }
+    offset = (offset + 1) % cycle;
+    delay(250);
   }
 }
-
 
 // payload handler
 void handlePayload(uint8_t* payload, size_t length) {
@@ -187,7 +161,7 @@ void handlePayload(uint8_t* payload, size_t length) {
         sendErrorMessage("lcdWrite value must be a string");
         return;
       }
-      lcdSentenceWrap(doc["body"]["value"]);
+      lcdPublishSentence(doc["body"]["name"], doc["body"]["value"]);
       sendOkMessage();
       return;
     }
@@ -235,14 +209,13 @@ static inline void initWS() {
 static inline void initLCD() {
   lcd.begin(16,2);
   lcd.clear();
-  lcd.print("Testing...");
+  lcd.print("Ready...");
 }
 
 void setup() {
   Serial.begin(115200);
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(MSG_LED, OUTPUT);
-  pinMode(NEXT_BUTTON, INPUT);
+  pinMode(NEXT_BUTTON, INPUT_PULLUP);
   initWS();
   initLCD();
 }
